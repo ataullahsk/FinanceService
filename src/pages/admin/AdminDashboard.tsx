@@ -125,6 +125,10 @@ export const AdminDashboard: React.FC = () => {
       loanType: 'Group Loan',
       amount: '₹2,00,000',
       status: 'Approved',
+      date: '2024-01-12'
+    }
+  ];
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'APPROVED': return 'bg-green-100 text-green-800';
