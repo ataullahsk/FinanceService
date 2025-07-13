@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send, CheckCircle } from 'lucide-react';
+import { contactService } from '../services/contactService';
 
 export const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -10,6 +11,7 @@ export const Contact: React.FC = () => {
     message: ''
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
@@ -20,15 +22,24 @@ export const Contact: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically send the form data to your backend
-    console.log('Form submitted:', formData);
-    setSubmitted(true);
-    
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
-    }, 3000);
+    setSubmitting(true);
+
+    contactService.submitContactMessage(formData)
+      .then(() => {
+        setSubmitted(true);
+        setSubmitting(false);
+        
+        // Reset form after 3 seconds
+        setTimeout(() => {
+          setSubmitted(false);
+          setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+        }, 3000);
+      })
+      .catch((error) => {
+        console.error('Error submitting contact message:', error);
+        alert('There was an error sending your message. Please try again.');
+        setSubmitting(false);
+      });
   };
 
   return (
@@ -197,10 +208,11 @@ export const Contact: React.FC = () => {
 
                     <button
                       type="submit"
-                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                      disabled={submitting}
+                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
                     >
                       <Send className="w-5 h-5" />
-                      <span>Send Message</span>
+                      <span>{submitting ? 'Sending...' : 'Send Message'}</span>
                     </button>
                   </form>
                 )}

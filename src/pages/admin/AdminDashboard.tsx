@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { AdminLayout } from '../../components/AdminLayout';
+import { loanApplicationService } from '../../services/loanApplicationService';
 import { 
   Users, 
   FileText, 
@@ -16,42 +18,76 @@ import {
 export const AdminDashboard: React.FC = () => {
   const { isAuthenticated } = useAdmin();
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    today: 0
+  });
+  const [recentApplications, setRecentApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/admin/login');
+    } else {
+      loadDashboardData();
     }
   }, [isAuthenticated, navigate]);
+
+  const loadDashboardData = async () => {
+    try {
+      // Load statistics
+      const statsData = await loanApplicationService.getApplicationStats();
+      setStats(statsData);
+
+      // Load recent applications
+      const { data } = await loanApplicationService.getAllApplications(1, 4);
+      const transformedData = data.map(app => ({
+        id: app.application_id,
+        name: `${app.first_name} ${app.last_name}`,
+        loanType: app.loan_type,
+        amount: `₹${app.loan_amount.toLocaleString()}`,
+        status: app.status,
+        date: new Date(app.created_at).toLocaleDateString()
+      }));
+      setRecentApplications(transformedData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      setLoading(false);
+    }
+  };
 
   if (!isAuthenticated) {
     return null;
   }
 
-  const stats = [
+  const statsCards = [
     {
       title: 'Total Applications',
-      value: '156',
+      value: stats.total.toString(),
       change: '+12%',
       icon: FileText,
       color: 'blue'
     },
     {
       title: 'Approved Loans',
-      value: '89',
+      value: stats.approved.toString(),
       change: '+8%',
       icon: CheckCircle,
       color: 'green'
     },
     {
       title: 'Pending Review',
-      value: '23',
+      value: stats.pending.toString(),
       change: '+3',
       icon: Clock,
       color: 'yellow'
     },
     {
-      title: 'Total Disbursed',
-      value: '₹2.3 Cr',
+      title: 'Today\'s Applications',
+      value: stats.today.toString(),
       change: '+15%',
       icon: DollarSign,
       color: 'purple'
@@ -89,16 +125,12 @@ export const AdminDashboard: React.FC = () => {
       loanType: 'Group Loan',
       amount: '₹2,00,000',
       status: 'Approved',
-      date: '2024-01-12'
-    }
-  ];
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Approved': return 'bg-green-100 text-green-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
-      case 'Under Review': return 'bg-blue-100 text-blue-800';
-      case 'Rejected': return 'bg-red-100 text-red-800';
+      case 'APPROVED': return 'bg-green-100 text-green-800';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+      case 'UNDER_REVIEW': return 'bg-blue-100 text-blue-800';
+      case 'REJECTED': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -113,6 +145,16 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -124,7 +166,7 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
+          {statsCards.map((stat, index) => (
             <div key={index} className="bg-white rounded-xl shadow-sm p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -248,19 +290,21 @@ export const AdminDashboard: React.FC = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Today's Applications</span>
-                <span className="text-sm font-medium text-gray-900">12</span>
+                <span className="text-sm font-medium text-gray-900">{stats.today}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">This Week</span>
-                <span className="text-sm font-medium text-gray-900">47</span>
+                <span className="text-sm font-medium text-gray-900">{stats.total}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">This Month</span>
-                <span className="text-sm font-medium text-gray-900">156</span>
+                <span className="text-sm font-medium text-gray-900">{stats.total}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Approval Rate</span>
-                <span className="text-sm font-medium text-green-600">78%</span>
+                <span className="text-sm font-medium text-green-600">
+                  {stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}%
+                </span>
               </div>
             </div>
           </div>
@@ -271,21 +315,21 @@ export const AdminDashboard: React.FC = () => {
               <div className="flex items-start space-x-2">
                 <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5" />
                 <div>
-                  <p className="text-sm text-gray-900">5 applications pending review</p>
+                  <p className="text-sm text-gray-900">{stats.pending} applications pending review</p>
                   <p className="text-xs text-gray-500">Due today</p>
                 </div>
               </div>
               <div className="flex items-start space-x-2">
                 <CheckCircle className="w-4 h-4 text-green-500 mt-0.5" />
                 <div>
-                  <p className="text-sm text-gray-900">3 loans approved</p>
+                  <p className="text-sm text-gray-900">{stats.approved} loans approved</p>
                   <p className="text-xs text-gray-500">Ready for disbursement</p>
                 </div>
               </div>
               <div className="flex items-start space-x-2">
                 <Clock className="w-4 h-4 text-blue-500 mt-0.5" />
                 <div>
-                  <p className="text-sm text-gray-900">2 follow-ups required</p>
+                  <p className="text-sm text-gray-900">{stats.today} new applications today</p>
                   <p className="text-xs text-gray-500">Documents pending</p>
                 </div>
               </div>

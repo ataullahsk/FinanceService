@@ -1,6 +1,8 @@
 import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle, Calculator, Clock, Shield } from 'lucide-react';
+import { loanTypeService } from '../services/loanTypeService';
 
 export const LoanTypes: React.FC = () => {
   const loanTypes = [
@@ -152,39 +154,209 @@ export const LoanTypes: React.FC = () => {
         'Tax returns',
         'Bank statements',
         'Business plan'
-      ]
-    },
-    {
-      id: 'education',
-      title: 'Education Loans',
-      description: 'Invest in your future with our education loans for higher studies in India and abroad.',
-      icon: '🎓',
-      rate: '9.8%',
-      amount: 'Up to ₹30 Lakhs',
-      tenure: '60 - 180 months',
-      processingTime: '3-5 days',
-      features: [
+  const [loanTypes, setLoanTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loanTypeService.getActiveLoanTypes()
+      .then((data) => {
+        // Transform database data to match component structure
+        const transformedData = data.map(loan => ({
+          id: loan.id,
+          title: loan.name,
+          description: loan.description,
+          icon: getIconForLoanType(loan.name),
+          rate: `${loan.interest_rate}%`,
+          amount: `Up to ₹${(loan.max_amount / 100000).toFixed(0)} Lakhs`,
+          tenure: `${loan.min_tenure} - ${loan.max_tenure} months`,
+          processingTime: getProcessingTime(loan.name),
+          features: getFeaturesForLoanType(loan.name),
+          eligibility: getEligibilityForLoanType(loan.name),
+          documents: getDocumentsForLoanType(loan.name)
+        }));
+        setLoanTypes(transformedData);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error fetching loan types:', error);
+        setLoading(false);
+      });
+  }, []);
+
+  const getIconForLoanType = (name) => {
+    const iconMap = {
+      'Personal Loan': '👤',
+      'Home Loan': '🏠',
+      'Car Loan': '🚗',
+      'Group Loan': '👥',
+      'Business Loan': '💼',
+      'Education Loan': '🎓'
+    };
+    return iconMap[name] || '💰';
+  };
+
+  const getProcessingTime = (name) => {
+    const timeMap = {
+      'Personal Loan': '24 hours',
+      'Home Loan': '7-10 days',
+      'Car Loan': '2-3 days',
+      'Group Loan': '5-7 days',
+      'Business Loan': '5-10 days',
+      'Education Loan': '3-5 days'
+    };
+    return timeMap[name] || '3-5 days';
+  };
+
+  const getFeaturesForLoanType = (name) => {
+    const featuresMap = {
+      'Personal Loan': [
+        'No collateral required',
+        'Quick approval process',
+        'Flexible repayment options',
+        'Minimal documentation',
+        'Online application'
+      ],
+      'Home Loan': [
+        'Competitive interest rates',
+        'Up to 90% property financing',
+        'Flexible EMI options',
+        'Tax benefits available',
+        'Balance transfer facility'
+      ],
+      'Car Loan': [
+        'Finance up to 90% of car value',
+        'New and used car financing',
+        'Quick loan approval',
+        'Flexible down payment',
+        'Insurance tie-ups'
+      ],
+      'Group Loan': [
+        'Community-based lending',
+        'Flexible group terms',
+        'Collective responsibility',
+        'Lower individual risk',
+        'Group insurance coverage'
+      ],
+      'Business Loan': [
+        'Working capital finance',
+        'Equipment financing',
+        'Business expansion loans',
+        'Overdraft facilities',
+        'Trade finance solutions'
+      ],
+      'Education Loan': [
         'Study in India or abroad',
         'Covers tuition & living costs',
         'Moratorium period available',
         'Tax benefits under 80E',
         'Flexible repayment options'
+      ]
+    };
+    return featuresMap[name] || ['Competitive rates', 'Quick processing', 'Flexible terms'];
+  };
+
+  const getEligibilityForLoanType = (name) => {
+    const eligibilityMap = {
+      'Personal Loan': [
+        'Age: 21-65 years',
+        'Minimum income: ₹15,000/month',
+        'Employment: Salaried/Self-employed',
+        'Credit score: 650+'
       ],
-      eligibility: [
+      'Home Loan': [
+        'Age: 23-65 years',
+        'Minimum income: ₹25,000/month',
+        'Employment: Stable job/business',
+        'Credit score: 700+'
+      ],
+      'Car Loan': [
+        'Age: 21-65 years',
+        'Minimum income: ₹20,000/month',
+        'Employment: Salaried/Self-employed',
+        'Valid driving license'
+      ],
+      'Group Loan': [
+        'Group of 5-20 members',
+        'Age: 18-65 years',
+        'Regular group meetings',
+        'Savings track record'
+      ],
+      'Business Loan': [
+        'Business age: 2+ years',
+        'Annual turnover: ₹10 lakhs+',
+        'Profit for last 2 years',
+        'Good credit history'
+      ],
+      'Education Loan': [
         'Student age: 16-35 years',
         'Admission confirmation',
         'Co-applicant required',
         'Academic performance'
+      ]
+    };
+    return eligibilityMap[name] || ['Age: 18-65 years', 'Valid documents', 'Good credit history'];
+  };
+
+  const getDocumentsForLoanType = (name) => {
+    const documentsMap = {
+      'Personal Loan': [
+        'Identity proof',
+        'Address proof',
+        'Income proof',
+        'Bank statements',
+        'Photograph'
       ],
-      documents: [
+      'Home Loan': [
+        'Identity & address proof',
+        'Income documents',
+        'Property documents',
+        'Bank statements',
+        'Employment proof'
+      ],
+      'Car Loan': [
+        'Identity & address proof',
+        'Income proof',
+        'Car quotation/invoice',
+        'Bank statements',
+        'Driving license'
+      ],
+      'Group Loan': [
+        'Group formation documents',
+        'Member identity proofs',
+        'Income statements',
+        'Group savings records',
+        'Meeting minutes'
+      ],
+      'Business Loan': [
+        'Business registration',
+        'Financial statements',
+        'Tax returns',
+        'Bank statements',
+        'Business plan'
+      ],
+      'Education Loan': [
         'Admission letter',
         'Fee structure',
         'Academic records',
         'Identity proofs',
         'Co-applicant documents'
       ]
-    }
-  ];
+    };
+    return documentsMap[name] || ['Identity proof', 'Address proof', 'Income proof'];
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="container mx-auto px-4">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading loan types...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

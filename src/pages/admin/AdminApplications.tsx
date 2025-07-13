@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { AdminLayout } from '../../components/AdminLayout';
+import { loanApplicationService } from '../../services/loanApplicationService';
 import { 
   Search, 
   Filter, 
@@ -19,13 +20,54 @@ export const AdminApplications: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/admin/login');
+    } else {
+      loadApplications();
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, currentPage, statusFilter, searchTerm]);
 
+  const loadApplications = async () => {
+    try {
+      setLoading(true);
+      const { data, count } = await loanApplicationService.getAllApplications(
+        currentPage,
+        10,
+        statusFilter === 'all' ? undefined : statusFilter,
+        searchTerm || undefined
+      );
+      
+      // Transform data to match component structure
+      const transformedData = data.map(app => ({
+        id: app.application_id,
+        name: `${app.first_name} ${app.last_name}`,
+        email: app.email,
+        phone: app.phone,
+        loanType: app.loan_type,
+        amount: app.loan_amount,
+        status: app.status,
+        date: new Date(app.created_at).toLocaleDateString(),
+        documents: ['ID Proof', 'Address Proof', 'Income Proof'], // Simplified for demo
+        employmentType: app.employment_type,
+        monthlyIncome: app.monthly_income,
+        dbId: app.id // Keep database ID for updates
+      }));
+      
+      setApplications(transformedData);
+      setTotalCount(count || 0);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading applications:', error);
+      setLoading(false);
+    }
+  };
   if (!isAuthenticated) {
     return null;
   }
@@ -94,42 +136,55 @@ export const AdminApplications: React.FC = () => {
       date: '2024-01-11',
       documents: ['ID Proof', 'Address Proof', 'Business Docs'],
       employmentType: 'Business Owner',
-      monthlyIncome: 180000
-    }
-  ];
-
-  const filteredApplications = applications.filter(app => {
-    const matchesSearch = app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         app.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || app.status.toLowerCase() === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Approved': return 'bg-green-100 text-green-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
-      case 'Under Review': return 'bg-blue-100 text-blue-800';
-      case 'Rejected': return 'bg-red-100 text-red-800';
+      case 'APPROVED': return 'bg-green-100 text-green-800';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+      case 'UNDER_REVIEW': return 'bg-blue-100 text-blue-800';
+      case 'REJECTED': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Approved': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'Pending': return <Clock className="w-4 h-4 text-yellow-500" />;
-      case 'Under Review': return <Eye className="w-4 h-4 text-blue-500" />;
-      case 'Rejected': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'APPROVED': return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'PENDING': return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'UNDER_REVIEW': return <Eye className="w-4 h-4 text-blue-500" />;
+      case 'REJECTED': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return <FileText className="w-4 h-4 text-gray-500" />;
     }
   };
 
-  const updateApplicationStatus = (id: string, newStatus: string) => {
-    // In a real app, this would call an API
-    console.log(`Updating application ${id} to ${newStatus}`);
-    // For demo purposes, we'll just log it
+  const updateApplicationStatus = async (app: any, newStatus: string) => {
+    try {
+      setUpdating(true);
+      await loanApplicationService.updateApplicationStatus(
+        app.dbId,
+        newStatus,
+        'admin', // In a real app, get from auth context
+        `Status updated to ${newStatus}`
+      );
+      
+      // Reload applications to reflect changes
+      await loadApplications();
+      setUpdating(false);
+    } catch (error) {
+      console.error('Error updating application status:', error);
+      alert('Error updating application status');
+      setUpdating(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -170,7 +225,7 @@ export const AdminApplications: React.FC = () => {
               >
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
-                <option value="under review">Under Review</option>
+                <option value="under_review">Under Review</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
               </select>
@@ -202,7 +257,7 @@ export const AdminApplications: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredApplications.map((app) => (
+                {applications.map((app) => (
                   <tr key={app.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
@@ -242,18 +297,20 @@ export const AdminApplications: React.FC = () => {
                           <Eye className="w-4 h-4" />
                           <span>View</span>
                         </button>
-                        {app.status === 'Pending' && (
+                        {app.status === 'PENDING' && (
                           <>
                             <button
-                              onClick={() => updateApplicationStatus(app.id, 'Approved')}
-                              className="text-green-600 hover:text-green-700 flex items-center space-x-1"
+                              onClick={() => updateApplicationStatus(app, 'APPROVED')}
+                              disabled={updating}
+                              className="text-green-600 hover:text-green-700 flex items-center space-x-1 disabled:opacity-50"
                             >
                               <CheckCircle className="w-4 h-4" />
                               <span>Approve</span>
                             </button>
                             <button
-                              onClick={() => updateApplicationStatus(app.id, 'Rejected')}
-                              className="text-red-600 hover:text-red-700 flex items-center space-x-1"
+                              onClick={() => updateApplicationStatus(app, 'REJECTED')}
+                              disabled={updating}
+                              className="text-red-600 hover:text-red-700 flex items-center space-x-1 disabled:opacity-50"
                             >
                               <XCircle className="w-4 h-4" />
                               <span>Reject</span>
@@ -324,25 +381,27 @@ export const AdminApplications: React.FC = () => {
                   </div>
                 </div>
                 
-                {selectedApplication.status === 'Pending' && (
+                {selectedApplication.status === 'PENDING' && (
                   <div className="flex space-x-4">
                     <button
                       onClick={() => {
-                        updateApplicationStatus(selectedApplication.id, 'Approved');
+                        updateApplicationStatus(selectedApplication, 'APPROVED');
                         setSelectedApplication(null);
                       }}
-                      className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                      disabled={updating}
+                      className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
-                      Approve Application
+                      {updating ? 'Updating...' : 'Approve Application'}
                     </button>
                     <button
                       onClick={() => {
-                        updateApplicationStatus(selectedApplication.id, 'Rejected');
+                        updateApplicationStatus(selectedApplication, 'REJECTED');
                         setSelectedApplication(null);
                       }}
-                      className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                      disabled={updating}
+                      className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                     >
-                      Reject Application
+                      {updating ? 'Updating...' : 'Reject Application'}
                     </button>
                   </div>
                 )}

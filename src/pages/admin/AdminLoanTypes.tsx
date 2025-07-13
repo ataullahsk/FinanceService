@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { AdminLayout } from '../../components/AdminLayout';
+import { loanTypeService } from '../../services/loanTypeService';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
 
 export const AdminLoanTypes: React.FC = () => {
@@ -72,9 +73,8 @@ export const AdminLoanTypes: React.FC = () => {
       minTenure: 60,
       maxTenure: 180,
       processingFee: 1.0,
-      active: true
-    }
-  ]);
+  const [loanTypes, setLoanTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -92,8 +92,33 @@ export const AdminLoanTypes: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/admin/login');
+    } else {
+      loadLoanTypes();
     }
   }, [isAuthenticated, navigate]);
+
+  const loadLoanTypes = async () => {
+    try {
+      const data = await loanTypeService.getAllLoanTypes();
+      // Transform data to match component structure
+      const transformedData = data.map(lt => ({
+        id: lt.id,
+        name: lt.name,
+        description: lt.description,
+        interestRate: lt.interest_rate,
+        maxAmount: lt.max_amount,
+        minTenure: lt.min_tenure,
+        maxTenure: lt.max_tenure,
+        processingFee: lt.processing_fee,
+        active: lt.is_active
+      }));
+      setLoanTypes(transformedData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading loan types:', error);
+      setLoading(false);
+    }
+  };
 
   if (!isAuthenticated) {
     return null;
@@ -104,27 +129,45 @@ export const AdminLoanTypes: React.FC = () => {
     setFormData({ ...loanType });
   };
 
-  const handleSave = () => {
-    if (editingId) {
-      setLoanTypes(prev => prev.map(lt => 
-        lt.id === editingId ? { ...formData, id: editingId } : lt
-      ));
-      setEditingId(null);
-    } else {
-      const newId = Math.max(...loanTypes.map(lt => lt.id)) + 1;
-      setLoanTypes(prev => [...prev, { ...formData, id: newId }]);
-      setShowAddForm(false);
+  const handleSave = async () => {
+    try {
+      const loanTypeData = {
+        name: formData.name,
+        description: formData.description,
+        interest_rate: formData.interestRate,
+        max_amount: formData.maxAmount,
+        min_tenure: formData.minTenure,
+        max_tenure: formData.maxTenure,
+        processing_fee: formData.processingFee,
+        is_active: formData.active
+      };
+
+      if (editingId) {
+        await loanTypeService.updateLoanType(editingId, loanTypeData);
+        setEditingId(null);
+      } else {
+        await loanTypeService.createLoanType(loanTypeData);
+        setShowAddForm(false);
+      }
+
+      // Reload loan types
+      await loadLoanTypes();
+      
+      // Reset form
+      setFormData({
+        name: '',
+        description: '',
+        interestRate: 0,
+        maxAmount: 0,
+        minTenure: 0,
+        maxTenure: 0,
+        processingFee: 0,
+        active: true
+      });
+    } catch (error) {
+      console.error('Error saving loan type:', error);
+      alert('Error saving loan type');
     }
-    setFormData({
-      name: '',
-      description: '',
-      interestRate: 0,
-      maxAmount: 0,
-      minTenure: 0,
-      maxTenure: 0,
-      processingFee: 0,
-      active: true
-    });
   };
 
   const handleCancel = () => {
@@ -142,17 +185,37 @@ export const AdminLoanTypes: React.FC = () => {
     });
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this loan type?')) {
-      setLoanTypes(prev => prev.filter(lt => lt.id !== id));
+      try {
+        await loanTypeService.deleteLoanType(id);
+        await loadLoanTypes();
+      } catch (error) {
+        console.error('Error deleting loan type:', error);
+        alert('Error deleting loan type');
+      }
     }
   };
 
-  const toggleActive = (id: number) => {
-    setLoanTypes(prev => prev.map(lt => 
-      lt.id === id ? { ...lt, active: !lt.active } : lt
-    ));
+  const toggleActive = async (id: number) => {
+    try {
+      await loanTypeService.toggleLoanTypeStatus(id);
+      await loadLoanTypes();
+    } catch (error) {
+      console.error('Error toggling loan type status:', error);
+      alert('Error updating loan type status');
+    }
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
