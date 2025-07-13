@@ -154,6 +154,9 @@ export const LoanTypes: React.FC = () => {
         'Tax returns',
         'Bank statements',
         'Business plan'
+      ]
+    }
+  ];
   const [loanTypes, setLoanTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
