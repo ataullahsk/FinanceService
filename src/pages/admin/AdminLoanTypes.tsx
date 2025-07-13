@@ -73,7 +73,9 @@ export const AdminLoanTypes: React.FC = () => {
       minTenure: 60,
       maxTenure: 180,
       processingFee: 1.0,
-  const [loanTypes, setLoanTypes] = useState([]);
+      active: true
+    }
+  ]);
   const [loading, setLoading] = useState(true);
 
   const [editingId, setEditingId] = useState<number | null>(null);
