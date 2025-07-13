@@ -136,6 +136,10 @@ export const AdminApplications: React.FC = () => {
       date: '2024-01-11',
       documents: ['ID Proof', 'Address Proof', 'Business Docs'],
       employmentType: 'Business Owner',
+      monthlyIncome: 150000
+    }
+  ];
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'APPROVED': return 'bg-green-100 text-green-800';
